@@ -1,0 +1,20 @@
+{
+  "rss_feeds": [
+    "http://feeds.bbci.co.uk/news/world/rss.xml",
+    "http://feeds.bbci.co.uk/news/uk/rss.xml",
+    "https://www.telegraph.co.uk/rss.xml",
+    "https://www.dailymail.co.uk/home/index.rss",
+    "http://www.independent.co.uk/rss",
+    "https://www.mirror.co.uk/?service=rss",
+    "https://www.thesun.co.uk/feed/",
+    "https://feeds.feedburner.com/daily-express-news-showbiz",
+    "https://metro.co.uk/feed/",
+    "https://www.channel4.com/news/feed",
+    "https://www.huffingtonpost.co.uk/feeds/index.xml",
+    "https://www.standard.co.uk/rss",
+    "https://www.independent.ie/rss",
+    "https://www.manchestereveningnews.co.uk/?service=rss",
+    "https://www.thenorthernecho.co.uk/news/rss/",
+    "https://www.belfastlive.co.uk/?service=rss"
+  ]
+}
