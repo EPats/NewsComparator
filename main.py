@@ -36,7 +36,10 @@ def get_articles_list(rss_url: str) -> list:
     soup = BeautifulSoup(r.content, 'xml')
     source_title = soup.find('title').text
 
-    for item in soup.find_all('item'):
+    for i, item in enumerate(soup.find_all('item')):
+        # Debugging line so we're not testing on hundreds of articles
+        if i > 5:
+            return articles
         article = {'source_title': source_title}
         for element, rss_tag in RSS_ELEMENTS.items():
             rss_element = item.find(rss_tag)
@@ -59,170 +62,180 @@ def get_article(article: dict) -> dict:
     soup = BeautifulSoup(r.content, 'html.parser')
     domain = urlparse(url).netloc.removeprefix('www.')
     if domain in ARTICLE_FUNCTIONS:
-        article_dict.update(ARTICLE_FUNCTIONS[domain](soup))
+        article_dict.update(ARTICLE_FUNCTIONS[domain](soup, url))
     else:
-        print(f'No scraping function found for {domain}')
+        print(f'No scraping function found for {domain}; trying default')
     return article_dict
 
 
-def get_article_content_bbc(soup: BeautifulSoup) -> dict:
+def get_article_content_bbc(soup: BeautifulSoup, url: str) -> dict:
     """
     Scrapes content from a BBC article.
 
     :param soup: Parsed HTML of the article.
     :return: Dictionary with scraped content.
     """
-    article_details = {}
-    article_body = soup.find(attrs={'id': 'main-content'})
-    if article_body:
-        article_title = article_body.find(attrs={'id': 'main-heading'})
-        if article_title:
-            article_details['article_title'] = article_title.text
-        # related?
-        video_block = article_body.find(attrs={'data-component': 'video-block'})
-        if video_block:
-            fig_caption = video_block.find('figcaption')
-            if fig_caption:
-                article_details['fig_caption'] = fig_caption.find('p').text
-        byline_block = article_body.find(attrs={'data-component': 'byline-block'})
-        if byline_block:
-            article_details['byline'] = byline_block.text
-        text_blocks = article_body.find_all(attrs={'data-component': 'text-block'})
-        bold_text = [text_block.text for text_block in text_blocks if text_block.find('b')]
-        reg_text = [text_block.text for text_block in text_blocks if text_block.text not in bold_text]
-        article_details['bold'] = bold_text
-        article_details['text'] = reg_text
-        if topic_list := article_body.find(attrs={'data-component': 'topic-list'}):
-            if topic_list_title := topic_list.find('h2'):
-                article_details['list_title'] = topic_list_title.text
-            for i, list_item in enumerate(topic_list.find_all('li')):
-                article_details[f'list_item_{i}'] = list_item.text
-                article_details[f'list_item_{i}_link'] = list_item.find('a')['href']
-    return article_details
+    # Extracting the title
+    page_title = soup.title.string.strip() if soup.title else None
+
+    title = soup.find('h1', {'id': 'main-heading'}).get('content', '').strip() if soup.find(
+        'h1', {'id': 'main-heading'}) else None
+    author = soup.find('div', attrs={'class': lambda e: 'TextContributorName' in e if e else False}) \
+        .get('content', '').strip() if soup.find('div', attrs={
+        'class': lambda e: 'TextContributorName' in e if e else False}) else None
+
+    if article_text_element := soup.find(name='div', attrs={'id': 'js-article-text'}):
+        title = article_text_element.find('h2').text if article_text_element.find('h2') else None
+
+    subtitle, article_text = [], []
+    # Extracting from the article body element
+    for text_block in soup.find_all(name='div', attrs={'data-component': 'text-block'}):
+        if bold_element := text_block.find('b'):
+            subtitle.append(bold_element.get('content', '').strip())
+        elif text_element := text_block.find('p'):
+            article_text.append(text_element.get('content', '').strip())
+
+    image_captions = []
+    for image_block in soup.find_all(name='div', attrs={'data-component': 'image-block'}):
+        if image_caption := image_block.get('content', '').strip():
+            image_captions.append(image_caption)
+        if image := image_block.find('img'):
+            if alt_text := image.get('alt'):
+                image_captions.append(alt_text)
+
+    keywords = [li.get('content', '').strip() for li in soup.find('div', attrs={'data-component': 'topic-list'})
+            .find_all('li')] if soup.find('div', attrs={'data-component': 'topic-list'}) else None
+    return {
+        'page_title': page_title,
+        'title': title,
+        'subtitle': subtitle,
+        'author': author,
+        'image_captions': image_captions,
+        'article_text': article_text,
+        'keywords': keywords
+    }
 
 
-def get_article_content_telegraph(soup: BeautifulSoup) -> dict:
+def get_article_content_telegraph(soup: BeautifulSoup, url: str) -> dict:
     """
     Scrapes content from a Telegraph article.
 
     :param soup: Parsed HTML of the article.
     :return: Dictionary with scraped content.
     """
-    article_details = {}
-    article_body = soup.find(attrs={'id': 'main-content'})
-    if article_body:
-        header = article_body.find('header')
-        if header:
-            article_title = header.find('h1')
-            if article_title:
-                article_details['article_title'] = article_title.text
-            article_subtitle = header.find('p')
-            if article_subtitle:
-                article_details['article_subtitle'] = article_subtitle.text
-            # related?
-        video_block = article_body.find(attrs={'data-component': 'video-block'})
-        if video_block:
-            fig_caption = video_block.find('figcaption')
-            if fig_caption:
-                article_details['fig_caption'] = fig_caption.find('p').text
-        byline_block = article_body.find_all(attrs={'class': 'e-byline__author'})
-        if byline_block:
-            article_details['byline'] = [author.text for author in byline_block]
-        text_blocks = article_body.find_all(attrs={'itemprop': 'articleBody'})
-        bold_text = [text_block.text for text_block in text_blocks if text_block.find('b')]
-        reg_text = [text_block.text for text_block in text_blocks if text_block.text not in bold_text]
-        article_details['bold'] = bold_text
-        article_details['text'] = reg_text
-        if topic_list := soup.find(attrs={'class': 'articleList section'}):
-            if topic_list_title := topic_list.find(attrs={'class': 'article-list__heading'}):
-                article_details['list_title'] = topic_list_title.text
-            for i, list_item in enumerate(topic_list.find_all(attrs={'class': 'list-headline'})):
-                article_details[f'list_item_{i}'] = list_item.text
-                article_details[f'list_item_{i}_link'] = list_item.find('a')['href']
-    return article_details
+
+    # Extracting the title
+    page_title = soup.title.string.strip() if soup.title else None
+    author = soup.find('meta', {'name': 'DCSext.author'}) \
+        .get('content', '').strip() if soup.find('meta', attrs={'name': 'DCSext.author'}) else None
+    keywords = soup.find('meta', {'name': 'keywords'}) \
+        .get('content', '').strip().split(',') if soup.find('meta', attrs={'name': 'keywords'}) else None
+    title = soup.find('meta', {'property': 'og:title'}) \
+        .get('content', '').strip() if soup.find('meta', attrs={'property': 'og:title'}) else None
+    subtitle = soup.find('meta', {'property': 'og:description'}) \
+        .get('content', '').strip() if soup.find('meta', attrs={'property': 'og:description'}) else None
+
+    image_captions = [image_caption.get('content', '').strip() for image_caption in soup.find_all('figcaption')]
+    article_text = [p.get('content', '').strip() for p in
+                    soup.find(name='div', attrs={'data-test': 'article-body-test'})
+                    .find_all('p')] if soup.find(name='div', attrs={'data-test': 'article-body-test'}) else None
+
+    return {
+        'page_title': page_title,
+        'title': title,
+        'subtitle': subtitle,
+        'author': author,
+        'image_captions': image_captions,
+        'article_text': article_text,
+        'keywords': keywords
+    }
 
 
-def get_article_content_daily_mail(soup: BeautifulSoup) -> dict:
+def get_article_content_daily_mail(soup: BeautifulSoup, url: str) -> dict:
     """
     Scrapes content from a Daily Mail article.
 
     :param soup: Parsed HTML of the article.
     :return: Dictionary with scraped content.
     """
-    # Extracting the title
-    title = soup.title.string.strip() if soup.title else None
 
-    # Extracting the author
+    # Extracting the title
+    page_title = soup.title.string.strip() if soup.title else None
+    keywords = soup.find('meta', {'property': 'keywords'}).get('content', '').strip() if soup.find('meta', {
+        'property': 'keywords'}) else None
+    subtitle = None
+    if subtitle_bullets := soup.find('ul', attrs={'class': 'mol-bullets-with-font'}):
+        subtitle = [li.get('content', '').strip() for li in subtitle_bullets.find_all('li')]
+
+    title = None
+    if article_text_element := soup.find(name='div', attrs={'id': 'js-article-text'}):
+        title = article_text_element.find('h2').text if article_text_element.find('h2') else None
     author = soup.find('meta', {'name': 'author'}).get('content', '').strip() if soup.find('meta',
                                                                                            {'name': 'author'}) else None
+    image_captions, article_text = [], []
+    # Extracting from the article body element
+    if article_body := soup.find(name='div', attrs={'itemprop': 'articleBody'}):
 
-    # Extracting image captions
-    image_captions = [caption.get_text(' ', strip=True) for caption in soup.find_all('figcaption')]
+        all_text = article_body.find_all('p')
+        image_captions, article_text = [], []
 
-    # Extracting the main article text (paragraphs)
-    article_text_div = soup.find('div', class_='article-text')
-
-    # Filtering out paragraphs that are likely not part of the main article (e.g., comments, related articles)
-    def is_relevant_paragraph(p):
-        lower_text = p.get_text().lower()
-        irrelevant_phrases = ["share what you think", "comments below", "views of mailonline"]
-        return not any(phrase in lower_text for phrase in irrelevant_phrases)
-
-    paragraphs = [p.get_text(' ', strip=True) for p in article_text_div.find_all('p') if
-                  is_relevant_paragraph(p)] if article_text_div else []
+        for text_element in all_text:
+            if text_element.get('class') == 'imageCaption':
+                image_captions.append(text_element.get_text(' ', strip=True))
+            else:
+                article_text.append(text_element.get_text(' ', strip=True))
 
     return {
-        "title": title,
-        "author": author,
-        "image_captions": image_captions,
-        "text": paragraphs
+        'page_title': page_title,
+        'title': title,
+        'subtitle': subtitle,
+        'author': author,
+        'image_captions': image_captions,
+        'article_text': article_text,
+        'keywords': keywords
     }
 
 
-def get_article_content_independent(soup: BeautifulSoup) -> dict:
+def get_article_content_independent(soup: BeautifulSoup, url: str) -> dict:
     """
     Scrapes content from an Independent article.
 
     :param soup: Parsed HTML of the article.
     :return: Dictionary with scraped content.
     """
-    # Extracting the title
-    title = soup.title.string.strip() if soup.title else None
+    page_title = soup.title.string.strip() if soup.title else None
 
-    # Extracting the author
     author = soup.find('meta', {'property': 'article:author_name'}).get('content', '').strip() if soup.find('meta', {
         'property': 'article:author_name'}) else None
+    keywords = soup.find('meta', {'property': 'keywords'}).get('content', '').strip() if soup.find('meta', {
+        'property': 'keywords'}) else None
 
-    # Attempting to extract the main article text by checking common tags and class names
-    article_content = None
+    title, subtitle = None, None
+    if article_header := soup.find('header', attrs={'id': 'articleHeader'}):
+        title = article_header.find('h1').get_text(' ', strip=True) if article_header.find('h1') else None
+        subtitle = article_header.find('h2').get_text(' ', strip=True) if article_header.find('h1') else None
 
-    # Check for <article> tag
-    if soup.article:
-        article_content = soup.article.get_text(' ', strip=True)
+    image_captions, article_text = [], []
+    if article_body := soup.find('div', attrs={'id': 'main'}):
 
-    # Check for <div> with class 'article-body' or similar if <article> tag is not present
-    if not article_content:
-        div_content = soup.find('div', class_='article-body') or soup.find('div', class_='article-content')
-        if div_content:
-            article_content = div_content.get_text(' ', strip=True)
+        all_text = article_body.find_all('p')
 
-    # If neither <article> nor <div> with 'article-body' class is found, use <main> tag
-    if not article_content:
-        if soup.main:
-            article_content = soup.main.get_text(' ', strip=True)
-
-    # Extracting image captions
-    image_captions = [caption.get_text(' ', strip=True) for caption in soup.find_all('figcaption')]
-
-    # Extracting paragraphs from the main article content
-    paragraphs = [p.get_text(' ', strip=True) for p in soup.find_all('p')]
+        for text_element in all_text:
+            if text_element.parent.parent.name == 'figcaption':
+                image_captions.append(text_element.get_text(' ', strip=True))
+            else:
+                article_text.append(text_element.get_text(' ', strip=True))
 
     return {
-        "title": title,
-        "author": author,
-        "image_captions": image_captions,
-        "text": paragraphs
+        'page_title': page_title,
+        'title': title,
+        'subtitle': subtitle,
+        'author': author,
+        'image_captions': image_captions,
+        'article_text': article_text,
+        'keywords': keywords
     }
+
 
 # Mapping of domains to their respective scraping functions.
 ARTICLE_FUNCTIONS = {
@@ -235,9 +248,9 @@ ARTICLE_FUNCTIONS = {
 # Sample list of URLs (can also be loaded from a JSON file).
 # #urls = get_rss_feeds_from_json_file('param.json')
 urls = [
- #   "http://feeds.bbci.co.uk/news/world/rss.xml",
- #   "http://feeds.bbci.co.uk/news/uk/rss.xml",
- #   "https://www.telegraph.co.uk/rss.xml",
+    "http://feeds.bbci.co.uk/news/world/rss.xml",
+    "http://feeds.bbci.co.uk/news/uk/rss.xml",
+    "https://www.telegraph.co.uk/rss.xml",
     "https://www.dailymail.co.uk/home/index.rss",
     "http://www.independent.co.uk/rss"
 ]
