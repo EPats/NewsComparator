@@ -78,32 +78,29 @@ def get_article_content_bbc(soup: BeautifulSoup, url: str) -> dict:
     # Extracting the title
     page_title = soup.title.string.strip() if soup.title else None
 
-    title = soup.find('h1', {'id': 'main-heading'}).get('content', '').strip() if soup.find(
+    title = soup.find('h1', {'id': 'main-heading'}).text.strip() if soup.find(
         'h1', {'id': 'main-heading'}) else None
     author = soup.find('div', attrs={'class': lambda e: 'TextContributorName' in e if e else False}) \
-        .get('content', '').strip() if soup.find('div', attrs={
+        .text.strip() if soup.find('div', attrs={
         'class': lambda e: 'TextContributorName' in e if e else False}) else None
-
-    if article_text_element := soup.find(name='div', attrs={'id': 'js-article-text'}):
-        title = article_text_element.find('h2').text if article_text_element.find('h2') else None
 
     subtitle, article_text = [], []
     # Extracting from the article body element
     for text_block in soup.find_all(name='div', attrs={'data-component': 'text-block'}):
         if bold_element := text_block.find('b'):
-            subtitle.append(bold_element.get('content', '').strip())
+            subtitle.append(bold_element.text.strip())
         elif text_element := text_block.find('p'):
-            article_text.append(text_element.get('content', '').strip())
+            article_text.append(text_element.text.strip())
 
     image_captions = []
     for image_block in soup.find_all(name='div', attrs={'data-component': 'image-block'}):
-        if image_caption := image_block.get('content', '').strip():
+        if image_caption := image_block.text.strip():
             image_captions.append(image_caption)
         if image := image_block.find('img'):
             if alt_text := image.get('alt'):
                 image_captions.append(alt_text)
 
-    keywords = [li.get('content', '').strip() for li in soup.find('div', attrs={'data-component': 'topic-list'})
+    keywords = [li.text.strip() for li in soup.find('div', attrs={'data-component': 'topic-list'})
             .find_all('li')] if soup.find('div', attrs={'data-component': 'topic-list'}) else None
     return {
         'page_title': page_title,
@@ -135,8 +132,8 @@ def get_article_content_telegraph(soup: BeautifulSoup, url: str) -> dict:
     subtitle = soup.find('meta', {'property': 'og:description'}) \
         .get('content', '').strip() if soup.find('meta', attrs={'property': 'og:description'}) else None
 
-    image_captions = [image_caption.get('content', '').strip() for image_caption in soup.find_all('figcaption')]
-    article_text = [p.get('content', '').strip() for p in
+    image_captions = [image_caption.text.strip() for image_caption in soup.find_all('figcaption')]
+    article_text = [p.text.strip() for p in
                     soup.find(name='div', attrs={'data-test': 'article-body-test'})
                     .find_all('p')] if soup.find(name='div', attrs={'data-test': 'article-body-test'}) else None
 
@@ -161,11 +158,11 @@ def get_article_content_daily_mail(soup: BeautifulSoup, url: str) -> dict:
 
     # Extracting the title
     page_title = soup.title.string.strip() if soup.title else None
-    keywords = soup.find('meta', {'property': 'keywords'}).get('content', '').strip() if soup.find('meta', {
-        'property': 'keywords'}) else None
-    subtitle = None
-    if subtitle_bullets := soup.find('ul', attrs={'class': 'mol-bullets-with-font'}):
-        subtitle = [li.get('content', '').strip() for li in subtitle_bullets.find_all('li')]
+    keywords = soup.find('meta', {'name': 'keywords'}).get('content', '').strip().split(',') if soup.find('meta', {
+        'name': 'keywords'}) else None
+
+    subtitle = [li.text.strip() for li in soup.find('ul', attrs={'class': 'mol-bullets-with-font'})
+        .find_all('li')] if soup.find('ul', attrs={'class': 'mol-bullets-with-font'}) else None
 
     title = None
     if article_text_element := soup.find(name='div', attrs={'id': 'js-article-text'}):
@@ -180,7 +177,7 @@ def get_article_content_daily_mail(soup: BeautifulSoup, url: str) -> dict:
         image_captions, article_text = [], []
 
         for text_element in all_text:
-            if text_element.get('class') == 'imageCaption':
+            if text_element.get('class', '') and text_element.get('class', '')[0] == 'imageCaption':
                 image_captions.append(text_element.get_text(' ', strip=True))
             else:
                 article_text.append(text_element.get_text(' ', strip=True))
@@ -207,7 +204,7 @@ def get_article_content_independent(soup: BeautifulSoup, url: str) -> dict:
 
     author = soup.find('meta', {'property': 'article:author_name'}).get('content', '').strip() if soup.find('meta', {
         'property': 'article:author_name'}) else None
-    keywords = soup.find('meta', {'property': 'keywords'}).get('content', '').strip() if soup.find('meta', {
+    keywords = soup.find('meta', {'property': 'keywords'}).get('content', '').strip().split(',') if soup.find('meta', {
         'property': 'keywords'}) else None
 
     title, subtitle = None, None
