@@ -13,33 +13,27 @@ RSS_ELEMENTS = {
 
 
 def get_rss_feeds_from_json_file(filepath: str) -> list:
-    """
-    Loads the RSS feed URLs from the given JSON file.
-
-    :param filepath: Path to the JSON file.
-    :return: List of RSS feed URLs.
-    """
+    """Load the RSS feed URLs from a JSON file."""
     with open(filepath, 'r') as file:
         json_data = json.load(file)
     return json_data['rss_feeds']
 
 
-def get_articles_list(rss_url: str) -> list:
+def fetch_articles_from_rss(rss_url: str, max_articles: int = -1) -> list:
     """
     Fetches and parses articles from the provided RSS URL.
-
     :param rss_url: URL of the RSS feed.
+    :param max_articles: maximum nuber of articles to pull (used for debugging)
     :return: List of dictionaries containing article details.
     """
     articles = []
-    r = requests.get(rss_url)
-    soup = BeautifulSoup(r.content, 'xml')
+    response = requests.get(rss_url)
+    soup = BeautifulSoup(response.content, 'xml')
     source_title = soup.find('title').text
 
     for i, item in enumerate(soup.find_all('item')):
-        # Debugging line so we're not testing on hundreds of articles
-        if i > 5:
-            return articles
+        if 0 < max_articles < i:
+            break
         article = {'source_title': source_title}
         for element, rss_tag in RSS_ELEMENTS.items():
             rss_element = item.find(rss_tag)
@@ -49,31 +43,35 @@ def get_articles_list(rss_url: str) -> list:
     return articles
 
 
-def get_article(article: dict) -> dict:
+def scrape_article_content(article: dict) -> dict:
     """
-    Scrapes the actual article content based on its domain.
+    Default article scraper when no custom implemented
 
-    :param article: Dictionary with basic article details.
-    :return: Updated dictionary with scraped content.
+    :param url: url for the article
+    :return: Dictionary with scraped content.
     """
     url = article['url']
-    article_dict = article
-    r = requests.get(url)
-    soup = BeautifulSoup(r.content, 'html.parser')
+    response = requests.get(url)
+    soup = BeautifulSoup(response.content, 'html.parser')
     domain = urlparse(url).netloc.removeprefix('www.')
-    if domain in ARTICLE_FUNCTIONS:
-        article_dict.update(ARTICLE_FUNCTIONS[domain](soup, url))
-    else:
-        print(f'No scraping function found for {domain}; trying default')
-        article_dict.update(get_article_content(soup, url))
+    default_flag = domain not in ARTICLE_FUNCTIONS
+    if default_flag:
+        print(f'No scraper found for {domain}; using default')
+    scraping_function = scrape_article_content_default if default_flag else ARTICLE_FUNCTIONS.get(domain)
+    article_dict = article.copy()
+    article_dict.update(scraping_function(soup))
+    if not default_flag and (article_dict['article_text'] is None or len(article_dict['article_text']) == 0):
+        print(f'Article text missing for scrape from {url}; trying to patch from default')
+        default_dict = scrape_article_content_default(soup)
+        article_dict = {key: default_dict[key] if not item else item for key, item in article_dict.items()}
     return article_dict
 
 
-def get_article_content(soup: BeautifulSoup, url: str) -> dict:
+def scrape_article_content_default(soup: BeautifulSoup) -> dict:
     """
-    Scrapes content from a BBC article.
+    Default article scraper when no custom implemented
 
-    :param soup: Parsed HTML of the article.
+    :param soup: soup object for the article
     :return: Dictionary with scraped content.
     """
     # Extracting the title
@@ -101,7 +99,8 @@ def get_article_content(soup: BeautifulSoup, url: str) -> dict:
         'keywords': keywords
     }
 
-def get_article_content_bbc(soup: BeautifulSoup, url: str) -> dict:
+
+def scrape_article_content_bbc(soup: BeautifulSoup) -> dict:
     """
     Scrapes content from a BBC article.
 
@@ -134,7 +133,7 @@ def get_article_content_bbc(soup: BeautifulSoup, url: str) -> dict:
                 image_captions.append(alt_text)
 
     keywords = [li.text.strip() for li in soup.find('div', attrs={'data-component': 'topic-list'})
-            .find_all('li')] if soup.find('div', attrs={'data-component': 'topic-list'}) else None
+    .find_all('li')] if soup.find('div', attrs={'data-component': 'topic-list'}) else None
     return {
         'page_title': page_title,
         'title': title,
@@ -146,7 +145,7 @@ def get_article_content_bbc(soup: BeautifulSoup, url: str) -> dict:
     }
 
 
-def get_article_content_telegraph(soup: BeautifulSoup, url: str) -> dict:
+def scrape_article_content_telegraph(soup: BeautifulSoup) -> dict:
     """
     Scrapes content from a Telegraph article.
 
@@ -181,7 +180,7 @@ def get_article_content_telegraph(soup: BeautifulSoup, url: str) -> dict:
     }
 
 
-def get_article_content_daily_mail(soup: BeautifulSoup, url: str) -> dict:
+def scrape_article_content_daily_mail(soup: BeautifulSoup) -> dict:
     """
     Scrapes content from a Daily Mail article.
 
@@ -195,7 +194,7 @@ def get_article_content_daily_mail(soup: BeautifulSoup, url: str) -> dict:
         'name': 'keywords'}) else None
 
     subtitle = [li.text.strip() for li in soup.find('ul', attrs={'class': 'mol-bullets-with-font'})
-        .find_all('li')] if soup.find('ul', attrs={'class': 'mol-bullets-with-font'}) else None
+    .find_all('li')] if soup.find('ul', attrs={'class': 'mol-bullets-with-font'}) else None
 
     title = None
     if article_text_element := soup.find(name='div', attrs={'id': 'js-article-text'}):
@@ -226,7 +225,7 @@ def get_article_content_daily_mail(soup: BeautifulSoup, url: str) -> dict:
     }
 
 
-def get_article_content_independent(soup: BeautifulSoup, url: str) -> dict:
+def scrape_article_content_independent(soup: BeautifulSoup) -> dict:
     """
     Scrapes content from an Independent article.
 
@@ -269,28 +268,35 @@ def get_article_content_independent(soup: BeautifulSoup, url: str) -> dict:
 
 # Mapping of domains to their respective scraping functions.
 ARTICLE_FUNCTIONS = {
-    'bbc.co.uk': get_article_content_bbc,
-    'telegraph.co.uk': get_article_content_telegraph,
-    'dailymail.co.uk': get_article_content_daily_mail,
-    'independent.co.uk': get_article_content_independent
+    'bbc.co.uk': scrape_article_content_bbc,
+    'telegraph.co.uk': scrape_article_content_telegraph,
+    'dailymail.co.uk': scrape_article_content_daily_mail,
+    'independent.co.uk': scrape_article_content_independent
 }
 
-# Sample list of URLs (can also be loaded from a JSON file).
-urls = get_rss_feeds_from_json_file('param.json')
-# urls = [
-#     "http://feeds.bbci.co.uk/news/world/rss.xml",
-#     "http://feeds.bbci.co.uk/news/uk/rss.xml",
-#     "https://www.telegraph.co.uk/rss.xml",
-#     "https://www.dailymail.co.uk/home/index.rss",
-#     "http://www.independent.co.uk/rss"
-# ]
 
-all_articles = []
-for url in urls:
-    all_articles += get_articles_list(url)
+def main():
+    # Sample list of URLs (can also be loaded from a JSON file).
+    urls = get_rss_feeds_from_json_file('param.json')
+    # urls = [
+    #     "http://feeds.bbci.co.uk/news/world/rss.xml",
+    #     "http://feeds.bbci.co.uk/news/uk/rss.xml",
+    #     "https://www.telegraph.co.uk/rss.xml",
+    #     "https://www.dailymail.co.uk/home/index.rss",
+    #     "http://www.independent.co.uk/rss"
+    # ]
 
-article_data = [get_article(article) for article in all_articles if 'url' in article]
+    all_articles = []
+    for url in urls:
+        all_articles += fetch_articles_from_rss(url, 2)
 
-# Saving the scraped articles to a JSON file.
-with open('data2.json', 'w') as outfile:
-    outfile.write(json.dumps(article_data, indent=4))
+    article_data = [scrape_article_content(article) for article in all_articles if
+                    'url' in article]
+
+    # Saving the scraped articles to a JSON file.
+    with open('data2.json', 'w') as outfile:
+        outfile.write(json.dumps(article_data, indent=4))
+
+
+if __name__ == "__main__":
+    main()
