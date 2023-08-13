@@ -65,8 +65,41 @@ def get_article(article: dict) -> dict:
         article_dict.update(ARTICLE_FUNCTIONS[domain](soup, url))
     else:
         print(f'No scraping function found for {domain}; trying default')
+        article_dict.update(get_article_content(soup, url))
     return article_dict
 
+
+def get_article_content(soup: BeautifulSoup, url: str) -> dict:
+    """
+    Scrapes content from a BBC article.
+
+    :param soup: Parsed HTML of the article.
+    :return: Dictionary with scraped content.
+    """
+    # Extracting the title
+    page_title = soup.title.string.strip() if soup.title else None
+    author = soup.find('meta', {'name': 'DCSext.author'}) \
+        .get('content', '').strip() if soup.find('meta', attrs={'name': 'DCSext.author'}) else None
+    keywords = soup.find('meta', {'name': 'keywords'}) \
+        .get('content', '').strip().split(',') if soup.find('meta', attrs={'name': 'keywords'}) else None
+    title = soup.find('meta', {'property': 'og:title'}) \
+        .get('content', '').strip() if soup.find('meta', attrs={'property': 'og:title'}) else None
+    subtitle = soup.find('meta', {'property': 'og:description'}) \
+        .get('content', '').strip() if soup.find('meta', attrs={'property': 'og:description'}) else None
+
+    article_text = [p.text.strip() for p in soup.find_all('p')]
+
+    image_captions = []
+
+    return {
+        'page_title': page_title,
+        'title': title,
+        'subtitle': subtitle,
+        'author': author,
+        'image_captions': image_captions,
+        'article_text': article_text,
+        'keywords': keywords
+    }
 
 def get_article_content_bbc(soup: BeautifulSoup, url: str) -> dict:
     """
@@ -243,20 +276,18 @@ ARTICLE_FUNCTIONS = {
 }
 
 # Sample list of URLs (can also be loaded from a JSON file).
-# #urls = get_rss_feeds_from_json_file('param.json')
-urls = [
-    "http://feeds.bbci.co.uk/news/world/rss.xml",
-    "http://feeds.bbci.co.uk/news/uk/rss.xml",
-    "https://www.telegraph.co.uk/rss.xml",
-    "https://www.dailymail.co.uk/home/index.rss",
-    "http://www.independent.co.uk/rss"
-]
+urls = get_rss_feeds_from_json_file('param.json')
+# urls = [
+#     "http://feeds.bbci.co.uk/news/world/rss.xml",
+#     "http://feeds.bbci.co.uk/news/uk/rss.xml",
+#     "https://www.telegraph.co.uk/rss.xml",
+#     "https://www.dailymail.co.uk/home/index.rss",
+#     "http://www.independent.co.uk/rss"
+# ]
 
 all_articles = []
 for url in urls:
     all_articles += get_articles_list(url)
-
-# print(json.dumps(all_articles, indent=4))
 
 article_data = [get_article(article) for article in all_articles if 'url' in article]
 
