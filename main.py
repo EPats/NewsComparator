@@ -76,8 +76,8 @@ def scrape_article_content_default(soup: BeautifulSoup) -> dict:
     """
     # Extracting the title
     page_title = soup.title.string.strip() if soup.title else None
-    author = soup.find('meta', {'name': 'DCSext.author'}) \
-        .get('content', '').strip() if soup.find('meta', attrs={'name': 'DCSext.author'}) else None
+    author = soup.find('meta', {'name': 'author'}) \
+        .get('content', '').strip() if soup.find('meta', attrs={'name': 'author'}) else None
     keywords = soup.find('meta', {'name': 'keywords'}) \
         .get('content', '').strip().split(',') if soup.find('meta', attrs={'name': 'keywords'}) else None
     title = soup.find('meta', {'property': 'og:title'}) \
@@ -266,12 +266,171 @@ def scrape_article_content_independent(soup: BeautifulSoup) -> dict:
     }
 
 
+def scrape_article_content_mirror(soup: BeautifulSoup) -> dict:
+    """
+    Scrapes content from a Mirror article.
+
+    :param soup: Parsed HTML of the article.
+    :return: Dictionary with scraped content.
+    """
+    """
+    Default article scraper when no custom implemented
+
+    :param soup: soup object for the article
+    :return: Dictionary with scraped content.
+    """
+    # Extracting the title
+    page_title = soup.title.string.strip() if soup.title else None
+    author = soup.find('meta', {'name': 'author'}) \
+        .get('content', '').strip() if soup.find('meta', attrs={'name': 'author'}) else None
+    keywords = soup.find('meta', {'name': 'keywords'}) \
+        .get('content', '').strip().split(',') if soup.find('meta', attrs={'name': 'keywords'}) else None
+    title = soup.find('meta', {'property': 'og:title'}) \
+        .get('content', '').strip() if soup.find('meta', attrs={'property': 'og:title'}) else None
+    subtitle = soup.find('meta', {'property': 'og:description'}) \
+        .get('content', '').strip() if soup.find('meta', attrs={'property': 'og:description'}) else None
+
+    article_text, image_captions = [], []
+    if article_body := soup.find('div', attrs={'class': 'article-body', 'itemprop': 'articleBody'}):
+        article_text = [p.text.strip() for p in article_body.find_all('p')]
+        image_captions = [span.text.strip() for span in article_body.find_all('span') if
+                          span.parent.name == 'figcaption']
+
+    return {
+        'page_title': page_title,
+        'title': title,
+        'subtitle': subtitle,
+        'author': author,
+        'image_captions': image_captions,
+        'article_text': article_text,
+        'keywords': keywords
+    }
+
+
+def scrape_article_content_sun(soup: BeautifulSoup) -> dict:
+    """
+    Scrapes content from a Sun article.
+
+    :param soup: Parsed HTML of the article.
+    :return: Dictionary with scraped content.
+    """
+    """
+    Default article scraper when no custom implemented
+
+    :param soup: soup object for the article
+    :return: Dictionary with scraped content.
+    """
+    # Extracting the title
+    page_title = soup.title.string.strip() if soup.title else None
+    title = soup.find('meta', {'property': 'og:title'}) \
+        .get('content', '').strip() if soup.find('meta', attrs={'property': 'og:title'}) else None
+    subtitle = soup.find('meta', {'property': 'og:description'}) \
+        .get('content', '').strip() if soup.find('meta', attrs={'property': 'og:description'}) else None
+    author = soup.find('a', {'rel': 'author'}) \
+        .text.strip() if soup.find('a', attrs={'rel': 'author'}) else None
+
+    article_text, image_captions = [], []
+    if article_body := soup.find('div', attrs={'class': 'article__content'}):
+        article_text = [p.text.strip() for p in article_body.find_all('p')]
+        image_captions = [span.text.strip() for span in article_body.find_all('span', attrs={'class':'article__media-span'})]
+
+    keywords = [li.text.strip() for li in soup.find('ul', attrs={'class': 'tags__list'}).find_all('li')] if soup.find('ul', attrs={'class': 'tags__list'}) else []
+
+    return {
+        'page_title': page_title,
+        'title': title,
+        'subtitle': subtitle,
+        'author': author,
+        'image_captions': image_captions,
+        'article_text': article_text,
+        'keywords': keywords
+    }
+
+
+def scrape_article_content_daily_express(soup: BeautifulSoup) -> dict:
+    """
+    Scrapes content from a Daily Express article.
+
+    :param soup: Parsed HTML of the article.
+    :return: Dictionary with scraped content.
+    """
+    """
+    Default article scraper when no custom implemented
+
+    :param soup: soup object for the article
+    :return: Dictionary with scraped content.
+    """
+    # Extracting the title
+    page_title = soup.title.string.strip() if soup.title else None
+    keywords = soup.find('meta', {'name': 'news_keywords'}).get('content', '').strip().split(',') \
+        if soup.find('meta', {'name': 'news_keywords'}) else \
+        [meta.get('content', '').strip() for meta in soup.find_all('meta', attrs={'property': 'article:tag'})]
+    title = soup.find('meta', {'property': 'og:title'}) \
+        .get('content', '').strip() if soup.find('meta', attrs={'property': 'og:title'}) else None
+    subtitle = soup.find('meta', {'property': 'og:description'}) \
+        .get('content', '').strip() if soup.find('meta', attrs={'property': 'og:description'}) else None
+    author = [span.text.strip() for span in soup.find('div', attrs={'class': 'main-author'}).find_all('span')] if soup.find('div', attrs={'class': 'main-author'}) else []
+
+    article_text, image_captions = [], []
+    if article_body := soup.find('div', attrs={'data-type': 'article-body'}):
+        article_text = [div.text.strip() for div in article_body.find_all('div', attrs={'class': 'text-description'}) if 'dont-miss' not in div.get('class', '')]
+        image_captions = [span.text.strip() for span in article_body.find_all('span', attrs={'class': 'newsCaption'})]
+
+    return {
+        'page_title': page_title,
+        'title': title,
+        'subtitle': subtitle,
+        'author': author,
+        'image_captions': image_captions,
+        'article_text': article_text,
+        'keywords': keywords
+    }
+
+
+def scrape_article_content_metro(soup: BeautifulSoup) -> dict:
+    """
+    Scrapes content from a Metro article.
+
+    :param soup: Parsed HTML of the article.
+    :return: Dictionary with scraped content.
+    """
+
+    # Extracting the title
+    page_title = soup.title.string.strip() if soup.title else None
+    author = [span.text.strip() for span in soup.find_all('span', attrs={'class': 'author-container'})]
+    keywords = [meta.get('content', '').strip() for meta in soup.find_all('meta', attrs={'property': 'article:tag'})]
+    title = soup.find('meta', {'property': 'og:title'}) \
+        .get('content', '').strip() if soup.find('meta', attrs={'property': 'og:title'}) else None
+    subtitle = soup.find('meta', {'property': 'og:description'}) \
+        .get('content', '').strip() if soup.find('meta', attrs={'property': 'og:description'}) else None
+
+    article_text, image_captions = [], []
+    if article_body := soup.find('div', attrs={'class': 'article-body'}):
+        article_text = [p.text.strip() for p in article_body.find_all('p')]
+        image_captions = [figcaption.text.strip() for figcaption in article_body.find_all('figcaption')]
+
+
+    return {
+        'page_title': page_title,
+        'title': title,
+        'subtitle': subtitle,
+        'author': author,
+        'image_captions': image_captions,
+        'article_text': article_text,
+        'keywords': keywords
+    }
+
+
 # Mapping of domains to their respective scraping functions.
 ARTICLE_FUNCTIONS = {
     'bbc.co.uk': scrape_article_content_bbc,
     'telegraph.co.uk': scrape_article_content_telegraph,
     'dailymail.co.uk': scrape_article_content_daily_mail,
-    'independent.co.uk': scrape_article_content_independent
+    'independent.co.uk': scrape_article_content_independent,
+    'mirror.co.uk': scrape_article_content_mirror,
+    'thesun.co.uk': scrape_article_content_sun,
+    'express.co.uk': scrape_article_content_daily_express,
+    'metro.co.uk': scrape_article_content_metro
 }
 
 
