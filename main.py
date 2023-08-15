@@ -433,7 +433,7 @@ ARTICLE_FUNCTIONS = {
     'metro.co.uk': scrape_article_content_metro
 }
 
-
+# "https://www.channel4.com/news/feed" removed from param - video based reporting
 def main():
     # Sample list of URLs (can also be loaded from a JSON file).
     urls = get_rss_feeds_from_json_file('param.json')
