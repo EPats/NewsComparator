@@ -76,8 +76,7 @@ def scrape_article_content_default(soup: BeautifulSoup) -> dict:
     """
     # Extracting the title
     page_title = soup.title.string.strip() if soup.title else None
-    author = soup.find('meta', {'name': 'author'}) \
-        .get('content', '').strip() if soup.find('meta', attrs={'name': 'author'}) else None
+    author = [meta.get('content', '').strip () for meta in soup.find_all('meta', {'name': 'author'})]
     keywords = soup.find('meta', {'name': 'keywords'}) \
         .get('content', '').strip().split(',') if soup.find('meta', attrs={'name': 'keywords'}) else None
     title = soup.find('meta', {'property': 'og:title'}) \
@@ -112,9 +111,8 @@ def scrape_article_content_bbc(soup: BeautifulSoup) -> dict:
 
     title = soup.find('h1', {'id': 'main-heading'}).text.strip() if soup.find(
         'h1', {'id': 'main-heading'}) else None
-    author = soup.find('div', attrs={'class': lambda e: 'TextContributorName' in e if e else False}) \
-        .text.strip() if soup.find('div', attrs={
-        'class': lambda e: 'TextContributorName' in e if e else False}) else None
+    author = [div.text.strip() for div in soup.find_all(
+        'div', attrs={'class': lambda e: 'TextContributorName' in e if e else False})]
 
     subtitle, article_text = [], []
     # Extracting from the article body element
@@ -155,8 +153,7 @@ def scrape_article_content_telegraph(soup: BeautifulSoup) -> dict:
 
     # Extracting the title
     page_title = soup.title.string.strip() if soup.title else None
-    author = soup.find('meta', {'name': 'DCSext.author'}) \
-        .get('content', '').strip() if soup.find('meta', attrs={'name': 'DCSext.author'}) else None
+    author = [meta.get('content', '').strip () for meta in soup.find_all('meta', {'name': 'DCSext.author'})]
     keywords = soup.find('meta', {'name': 'keywords'}) \
         .get('content', '').strip().split(',') if soup.find('meta', attrs={'name': 'keywords'}) else None
     title = soup.find('meta', {'property': 'og:title'}) \
@@ -190,6 +187,7 @@ def scrape_article_content_daily_mail(soup: BeautifulSoup) -> dict:
 
     # Extracting the title
     page_title = soup.title.string.strip() if soup.title else None
+    author = [meta.get('content', '').strip () for meta in soup.find_all('meta', {'name': 'author'})]
     keywords = soup.find('meta', {'name': 'keywords'}).get('content', '').strip().split(',') if soup.find('meta', {
         'name': 'keywords'}) else None
 
@@ -199,8 +197,7 @@ def scrape_article_content_daily_mail(soup: BeautifulSoup) -> dict:
     title = None
     if article_text_element := soup.find(name='div', attrs={'id': 'js-article-text'}):
         title = article_text_element.find('h2').text if article_text_element.find('h2') else None
-    author = soup.find('meta', {'name': 'author'}).get('content', '').strip() if soup.find('meta',
-                                                                                           {'name': 'author'}) else None
+
     image_captions, article_text = [], []
     # Extracting from the article body element
     if article_body := soup.find(name='div', attrs={'itemprop': 'articleBody'}):
@@ -233,9 +230,7 @@ def scrape_article_content_independent(soup: BeautifulSoup) -> dict:
     :return: Dictionary with scraped content.
     """
     page_title = soup.title.string.strip() if soup.title else None
-
-    author = soup.find('meta', {'property': 'article:author_name'}).get('content', '').strip() if soup.find('meta', {
-        'property': 'article:author_name'}) else None
+    author = [meta.get('content', '').strip () for meta in soup.find_all('meta', {'property': 'article:author_name'})]
     keywords = soup.find('meta', {'property': 'keywords'}).get('content', '').strip().split(',') if soup.find('meta', {
         'property': 'keywords'}) else None
 
@@ -273,16 +268,9 @@ def scrape_article_content_mirror(soup: BeautifulSoup) -> dict:
     :param soup: Parsed HTML of the article.
     :return: Dictionary with scraped content.
     """
-    """
-    Default article scraper when no custom implemented
-
-    :param soup: soup object for the article
-    :return: Dictionary with scraped content.
-    """
     # Extracting the title
     page_title = soup.title.string.strip() if soup.title else None
-    author = soup.find('meta', {'name': 'author'}) \
-        .get('content', '').strip() if soup.find('meta', attrs={'name': 'author'}) else None
+    author = [meta.get('content', '').strip () for meta in soup.find_all('meta', {'name': 'author'})]
     keywords = soup.find('meta', {'name': 'keywords'}) \
         .get('content', '').strip().split(',') if soup.find('meta', attrs={'name': 'keywords'}) else None
     title = soup.find('meta', {'property': 'og:title'}) \
@@ -314,20 +302,13 @@ def scrape_article_content_sun(soup: BeautifulSoup) -> dict:
     :param soup: Parsed HTML of the article.
     :return: Dictionary with scraped content.
     """
-    """
-    Default article scraper when no custom implemented
-
-    :param soup: soup object for the article
-    :return: Dictionary with scraped content.
-    """
     # Extracting the title
     page_title = soup.title.string.strip() if soup.title else None
     title = soup.find('meta', {'property': 'og:title'}) \
         .get('content', '').strip() if soup.find('meta', attrs={'property': 'og:title'}) else None
     subtitle = soup.find('meta', {'property': 'og:description'}) \
         .get('content', '').strip() if soup.find('meta', attrs={'property': 'og:description'}) else None
-    author = soup.find('a', {'rel': 'author'}) \
-        .text.strip() if soup.find('a', attrs={'rel': 'author'}) else None
+    author = [rel.text.strip() for rel in soup.find_all('a', {'rel': 'author'})]
 
     article_text, image_captions = [], []
     if article_body := soup.find('div', attrs={'class': 'article__content'}):
@@ -352,12 +333,6 @@ def scrape_article_content_daily_express(soup: BeautifulSoup) -> dict:
     Scrapes content from a Daily Express article.
 
     :param soup: Parsed HTML of the article.
-    :return: Dictionary with scraped content.
-    """
-    """
-    Default article scraper when no custom implemented
-
-    :param soup: soup object for the article
     :return: Dictionary with scraped content.
     """
     # Extracting the title
@@ -421,6 +396,142 @@ def scrape_article_content_metro(soup: BeautifulSoup) -> dict:
     }
 
 
+def scrape_article_content_huffpost(soup: BeautifulSoup) -> dict:
+    """
+    Huffpost scraper
+
+    :param soup: soup object for the article
+    :return: Dictionary with scraped content.
+    """
+    # Extracting the title
+    page_title = soup.title.string.strip() if soup.title else None
+    author = [span.text.strip () for span in soup.find('div', attrs={'class': 'entry__byline__author'}).find_all('span')] \
+        if soup.find('div', attrs={'class': 'entry__byline__author'}) else []
+    keywords = soup.find('meta', {'name': 'keywords'}) \
+        .get('content', '').strip().split(',') if soup.find('meta', attrs={'name': 'keywords'}) else None
+    title = soup.find('meta', {'property': 'og:title'}) \
+        .get('content', '').strip() if soup.find('meta', attrs={'property': 'og:title'}) else None
+    subtitle = soup.find('meta', {'property': 'og:description'}) \
+        .get('content', '').strip() if soup.find('meta', attrs={'property': 'og:description'}) else None
+
+    article_text, image_captions = [], []
+    if article_body := soup.find('section', attrs={'class': 'entry__content-list'}):
+        article_text = [p.text.strip() for p in article_body.find_all('p')]
+        image_captions = [figcaption.text.strip() for figcaption in article_body.find_all('figcaption')]
+
+    return {
+        'page_title': page_title,
+        'title': title,
+        'subtitle': subtitle,
+        'author': author,
+        'image_captions': image_captions,
+        'article_text': article_text,
+        'keywords': keywords
+    }
+
+
+def scrape_article_content_standard(soup: BeautifulSoup) -> dict:
+    """
+    standard scraper
+
+    :param soup: soup object for the article
+    :return: Dictionary with scraped content.
+    """
+    # Extracting the title
+    page_title = soup.title.string.strip() if soup.title else None
+    author = [meta.get('content', '').strip () for meta in soup.find_all('meta', {'name': 'author'})]
+    keywords = soup.find('meta', {'name': 'keywords'}) \
+        .get('content', '').strip().split(',') if soup.find('meta', attrs={'name': 'keywords'}) else None
+    title = soup.find('meta', {'property': 'og:title'}) \
+        .get('content', '').strip() if soup.find('meta', attrs={'property': 'og:title'}) else None
+    subtitle = soup.find('meta', {'property': 'og:description'}) \
+        .get('content', '').strip() if soup.find('meta', attrs={'property': 'og:description'}) else None
+
+    article_text = []
+    if article_body := soup.find('div', attrs={'id': 'main'}):
+        article_text = [p.text.strip() for p in article_body.find_all('p')]
+
+    image_captions = [figcaption.text.strip() for figcaption in soup.find_all('figcaption')]
+
+    return {
+        'page_title': page_title,
+        'title': title,
+        'subtitle': subtitle,
+        'author': author,
+        'image_captions': image_captions,
+        'article_text': article_text,
+        'keywords': keywords
+    }
+
+
+def scrape_article_content_manchester(soup: BeautifulSoup) -> dict:
+    """
+    Default article scraper when no custom implemented
+
+    :param soup: soup object for the article
+    :return: Dictionary with scraped content.
+    """
+    # Extracting the title
+    page_title = soup.title.string.strip() if soup.title else None
+    author = [meta.get('content', '').strip () for meta in soup.find_all('meta', {'name': 'author'})]
+    keywords = soup.find('meta', {'name': 'keywords'}) \
+        .get('content', '').strip().split(',') if soup.find('meta', attrs={'name': 'keywords'}) else None
+    title = soup.find('meta', {'property': 'og:title'}) \
+        .get('content', '').strip() if soup.find('meta', attrs={'property': 'og:title'}) else None
+    subtitle = soup.find('meta', {'property': 'og:description'}) \
+        .get('content', '').strip() if soup.find('meta', attrs={'property': 'og:description'}) else None
+
+    article_text, image_captions = [], []
+    if article_body := soup.find('div', attrs={'class': 'content-column'}):
+        article_text = [p.text.strip() for p in article_body.find_all('p')]
+        image_captions = [figcaption.text.strip() for figcaption in article_body.find_all('figcaption')]
+
+    return {
+        'page_title': page_title,
+        'title': title,
+        'subtitle': subtitle,
+        'author': author,
+        'image_captions': image_captions,
+        'article_text': article_text,
+        'keywords': keywords
+    }
+
+
+def scrape_article_content_belfast(soup: BeautifulSoup) -> dict:
+    """
+    Default article scraper when no custom implemented
+
+    :param soup: soup object for the article
+    :return: Dictionary with scraped content.
+    """
+    # Extracting the title
+    page_title = soup.title.string.strip() if soup.title else None
+    author = [meta.get('content', '').strip () for meta in soup.find_all('meta', {'name': 'author'})]
+    keywords = soup.find('meta', {'name': 'keywords'}) \
+        .get('content', '').strip().split(',') if soup.find('meta', attrs={'name': 'keywords'}) else None
+    title = soup.find('meta', {'property': 'og:title'}) \
+        .get('content', '').strip() if soup.find('meta', attrs={'property': 'og:title'}) else None
+    subtitle = soup.find('meta', {'property': 'og:description'}) \
+        .get('content', '').strip() if soup.find('meta', attrs={'property': 'og:description'}) else None
+
+    image_captions = [figcaption.text.strip() for figcaption in soup.find_all('figcaption')]
+
+    article_text = []
+    if article_body := soup.find('div', attrs={'class': 'article-body'}):
+        article_text = [p.text.strip() for p in article_body.find_all('p')]
+
+
+    return {
+        'page_title': page_title,
+        'title': title,
+        'subtitle': subtitle,
+        'author': author,
+        'image_captions': image_captions,
+        'article_text': article_text,
+        'keywords': keywords
+    }
+
+
 # Mapping of domains to their respective scraping functions.
 ARTICLE_FUNCTIONS = {
     'bbc.co.uk': scrape_article_content_bbc,
@@ -430,7 +541,11 @@ ARTICLE_FUNCTIONS = {
     'mirror.co.uk': scrape_article_content_mirror,
     'thesun.co.uk': scrape_article_content_sun,
     'express.co.uk': scrape_article_content_daily_express,
-    'metro.co.uk': scrape_article_content_metro
+    'metro.co.uk': scrape_article_content_metro,
+    'huffingtonpost.co.uk': scrape_article_content_huffpost,
+    'standard.co.uk': scrape_article_content_standard,
+    'manchestereveningnews.co.uk': scrape_article_content_manchester,
+    'belfastlive.co.uk': scrape_article_content_belfast
 }
 
 # "https://www.channel4.com/news/feed" removed from param - video based reporting
@@ -447,7 +562,7 @@ def main():
 
     all_articles = []
     for url in urls:
-        all_articles += fetch_articles_from_rss(url, 2)
+        all_articles += fetch_articles_from_rss(url)
 
     article_data = [scrape_article_content(article) for article in all_articles if
                     'url' in article]
