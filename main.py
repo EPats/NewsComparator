@@ -2,6 +2,11 @@ import requests
 from bs4 import BeautifulSoup
 import json
 from urllib.parse import urlparse
+import re
+import nltk
+from nltk.stem import WordNetLemmatizer
+from nltk.tokenize import word_tokenize, sent_tokenize
+from nltk.corpus import wordnet
 
 # Dictionary mapping RSS elements we're interested in to their actual tags in the RSS.
 RSS_ELEMENTS = {
@@ -549,20 +554,15 @@ ARTICLE_FUNCTIONS = {
 }
 
 # "https://www.channel4.com/news/feed" removed from param - video based reporting
-def main():
-    # Sample list of URLs (can also be loaded from a JSON file).
+
+
+
+def fetch_article_data(max_articles: int = -1):
     urls = get_rss_feeds_from_json_file('param.json')
-    # urls = [
-    #     "http://feeds.bbci.co.uk/news/world/rss.xml",
-    #     "http://feeds.bbci.co.uk/news/uk/rss.xml",
-    #     "https://www.telegraph.co.uk/rss.xml",
-    #     "https://www.dailymail.co.uk/home/index.rss",
-    #     "http://www.independent.co.uk/rss"
-    # ]
 
     all_articles = []
     for url in urls:
-        all_articles += fetch_articles_from_rss(url)
+        all_articles += fetch_articles_from_rss(url, max_articles)
 
     article_data = [scrape_article_content(article) for article in all_articles if
                     'url' in article]
@@ -571,6 +571,48 @@ def main():
     with open('data2.json', 'w') as outfile:
         outfile.write(json.dumps(article_data, indent=4))
 
+
+def get_wordnet_pos(treebank_tag):
+    """
+    Map POS tag to first character used by WordNetLemmatizer
+    """
+    tag = {
+        'J': wordnet.ADJ,
+        'N': wordnet.NOUN,
+        'V': wordnet.VERB,
+        'R': wordnet.ADV
+    }
+    return tag.get(treebank_tag[0], wordnet.NOUN)
+
+
+def lemmatize_text(text):
+    lemmatizer = WordNetLemmatizer()
+    tokenized_sent = sent_tokenize(text)
+
+    lemmatized_sent = []
+    for sentence in tokenized_sent:
+        tokenized_words = word_tokenize(sentence)
+        word_pos = nltk.pos_tag(tokenized_words)
+        lemmatized_words = [lemmatizer.lemmatize(word, get_wordnet_pos(pos)) for word, pos in word_pos]
+        lemmatized_sent.append(' '.join(lemmatized_words))
+
+    return ' '.join(lemmatized_sent)
+
+def analyse_from_file(path: str):
+    with open(path, 'r') as file:
+        articles = json.load(file)
+
+    for article in articles:
+        article['full_text'] = ' '.join([text for text in article['article_text'] if re.sub(r'[^\w\s]', '', text)])
+        article['lemmatized_text'] = lemmatize_text(article['full_text'])
+
+    # Saving the scraped articles to a JSON file.
+    with open('data3.json', 'w') as outfile:
+        outfile.write(json.dumps(articles, indent=4))
+
+def main():
+    # fetch_article_data()
+    analyse_from_file('data2.json')
 
 if __name__ == "__main__":
     main()
