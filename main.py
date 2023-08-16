@@ -603,7 +603,7 @@ def analyse_from_file(path: str):
         articles = json.load(file)
 
     for article in articles:
-        article['full_text'] = ' '.join([text for text in article['article_text'] if re.sub(r'[^\w\s]', '', text)])
+        article['full_text'] = ' '.join([article['title'] + article['subtitle'] + text for text in article['article_text'] if re.sub(r'[^\w\s]', '', text)])
         article['lemmatized_text'] = lemmatize_text(article['full_text'])
 
     # Saving the scraped articles to a JSON file.
