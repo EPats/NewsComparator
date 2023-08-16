@@ -603,6 +603,13 @@ def lemmatize_text(text, stop_words):
 
     return lemmatized_sent
 
+
+def preprocess(text, stop_words):
+    tokens = re.findall(r'\b\w+\b', text.lower())
+    tokens = [t for t in tokens if t not in stop_words]
+    return tokens
+
+
 def analyse_from_file(path: str):
 
     articles = []
@@ -648,7 +655,7 @@ def analyse_from_file(path: str):
         article['raw_keywords'] = top_keywords_raw
         article['lem_keywords'] = top_keywords_lem
 
-        texts = article['full_text'].split('.')
+        texts = [preprocess(sent, stop_words) for sent in article['full_text'].split('.')]
         dictionary = corpora.Dictionary(texts)
         corpus = [dictionary.doc2bow(text) for text in texts]
         lda_model = LdaModel(corpus, num_topics=3, id2word=dictionary, random_state=42)
@@ -656,7 +663,7 @@ def analyse_from_file(path: str):
         print(f'Topics: {topics}')
         article['raw_lda_topics'] = topics
 
-        texts = article['lemmatized_text'].split('.')
+        texts = [preprocess(sent, stop_words) for sent in article['lemmatized_text'].split('.')]
         dictionary = corpora.Dictionary(texts)
         corpus = [dictionary.doc2bow(text) for text in texts]
         lda_model = LdaModel(corpus, num_topics=3, id2word=dictionary, random_state=42)
