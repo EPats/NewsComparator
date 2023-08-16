@@ -6,8 +6,13 @@ import re
 import nltk
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize, sent_tokenize
-from nltk.corpus import wordnet
+from nltk.corpus import wordnet, stopwords
+from sklearn.feature_extraction.text import TfidfVectorizer
+from gensim import corpora
+from gensim.models.ldamodel import LdaModel
+import numpy as np
 
+nltk.download('stopwords')
 # Dictionary mapping RSS elements we're interested in to their actual tags in the RSS.
 RSS_ELEMENTS = {
     'linked_title': 'title',
@@ -585,7 +590,7 @@ def get_wordnet_pos(treebank_tag):
     return tag.get(treebank_tag[0], wordnet.NOUN)
 
 
-def lemmatize_text(text):
+def lemmatize_text(text, stop_words):
     lemmatizer = WordNetLemmatizer()
     tokenized_sent = sent_tokenize(text)
 
@@ -593,22 +598,55 @@ def lemmatize_text(text):
     for sentence in tokenized_sent:
         tokenized_words = word_tokenize(sentence)
         word_pos = nltk.pos_tag(tokenized_words)
-        lemmatized_words = [lemmatizer.lemmatize(word, get_wordnet_pos(pos)) for word, pos in word_pos]
+        lemmatized_words = [lemmatizer.lemmatize(word, get_wordnet_pos(pos)) for word, pos in word_pos if word not in stop_words]
         lemmatized_sent.append(' '.join(lemmatized_words))
 
     return lemmatized_sent
 
 def analyse_from_file(path: str):
+
+    articles = []
     with open(path, 'r') as file:
         articles = json.load(file)
 
+    stop_words = set(stopwords.words('english'))
     for article in articles:
 
-#### need to fix pulls, subtitles are sometimes lists, sometimes sttrings
-        sub = article['subtitle'] if type(article['subtitle']) == list else [article['subtitle']]
-        article['full_text'] = ' '.join([article['title']] + sub + [text for text in article['article_text'] if re.sub(r'[^\w\s]', '', text)])
-        lemmatized_sentences = lemmatize_text(article['full_text'])
+    #### need to fix pulls, subtitles are sometimes lists, sometimes sttrings
+        sub = article['subtitle'] if type(article['subtitle']) == list else [article['subtitle']] if article['subtitle'] else []
+        article['full_text'] = ' '.join(([article['title']] if article['title'] else [])
+                                        + sub + [text for text in article['article_text'] if re.sub(r'[^\w\s]', '', text)])
+        lemmatized_sentences = lemmatize_text(article['full_text'], stop_words)
         article['lemmatized_text'] = ' '.join(lemmatized_sentences)
+
+
+    corpus_raw_text = [article['full_text'] for article in articles]
+    corpus_lem_text = [article['lemmatized_text'] for article in articles]
+    # Initialize and fit TF-IDF vectorizer
+    vectorizer_raw = TfidfVectorizer()
+    vectorizer_lem = TfidfVectorizer()
+    tfidf_matrix_raw = vectorizer_raw.fit_transform(corpus_raw_text)
+    tfidf_matrix_lem = vectorizer_lem.fit_transform(corpus_lem_text)
+
+    # To get top N keywords for a document based on tf-idf score:
+    N = 5
+    for i, article in enumerate(articles):
+        feature_array_raw = np.array(vectorizer_raw.get_feature_names_out())
+        tfidf_sorting_raw = np.argsort(tfidf_matrix_raw[i].toarray()).flatten()[::-1]
+        top_keywords_raw = []
+        j = 0
+        for keyword in feature_array_raw[tfidf_sorting_raw]:
+            if keyword not in stop_words:
+                top_keywords_raw.append(keyword)
+                j += 1
+            if j >= N:
+                break
+        feature_array_lem = np.array(vectorizer_lem.get_feature_names_out())
+        tfidf_sorting_lem = np.argsort(tfidf_matrix_lem[i].toarray()).flatten()[::-1]
+        top_keywords_lem = [keyword for keyword in feature_array_lem[tfidf_sorting_lem][:N]]
+        print(f'Document: {article["url"]}\nTop {N} keywords: {top_keywords_raw}\nTop {N} lem keywords: {top_keywords_lem}\n')
+        article['raw_keywords'] = top_keywords_raw
+        article['lem_keywords'] = top_keywords_lem
 
     # Saving the scraped articles to a JSON file.
     with open('data3.json', 'w') as outfile:
