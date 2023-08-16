@@ -596,15 +596,19 @@ def lemmatize_text(text):
         lemmatized_words = [lemmatizer.lemmatize(word, get_wordnet_pos(pos)) for word, pos in word_pos]
         lemmatized_sent.append(' '.join(lemmatized_words))
 
-    return ' '.join(lemmatized_sent)
+    return lemmatized_sent
 
 def analyse_from_file(path: str):
     with open(path, 'r') as file:
         articles = json.load(file)
 
     for article in articles:
-        article['full_text'] = ' '.join([article['title'] + article['subtitle'] + text for text in article['article_text'] if re.sub(r'[^\w\s]', '', text)])
-        article['lemmatized_text'] = lemmatize_text(article['full_text'])
+
+#### need to fix pulls, subtitles are sometimes lists, sometimes sttrings
+        sub = article['subtitle'] if type(article['subtitle']) == list else [article['subtitle']]
+        article['full_text'] = ' '.join([article['title']] + sub + [text for text in article['article_text'] if re.sub(r'[^\w\s]', '', text)])
+        lemmatized_sentences = lemmatize_text(article['full_text'])
+        article['lemmatized_text'] = ' '.join(lemmatized_sentences)
 
     # Saving the scraped articles to a JSON file.
     with open('data3.json', 'w') as outfile:
