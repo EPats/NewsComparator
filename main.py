@@ -648,6 +648,22 @@ def analyse_from_file(path: str):
         article['raw_keywords'] = top_keywords_raw
         article['lem_keywords'] = top_keywords_lem
 
+        texts = article['full_text'].split('.')
+        dictionary = corpora.Dictionary(texts)
+        corpus = [dictionary.doc2bow(text) for text in texts]
+        lda_model = LdaModel(corpus, num_topics=3, id2word=dictionary, random_state=42)
+        topics = lda_model.print_topics(num_words=5)
+        print(f'Topics: {topics}')
+        article['raw_lda_topics'] = topics
+
+        texts = article['lemmatized_text'].split('.')
+        dictionary = corpora.Dictionary(texts)
+        corpus = [dictionary.doc2bow(text) for text in texts]
+        lda_model = LdaModel(corpus, num_topics=3, id2word=dictionary, random_state=42)
+        topics = lda_model.print_topics(num_words=5)
+        print(f'Lem Topics: {topics}')
+        article['lem_lda_topics'] = topics
+
     # Saving the scraped articles to a JSON file.
     with open('data3.json', 'w') as outfile:
         outfile.write(json.dumps(articles, indent=4))
