@@ -11,8 +11,12 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from gensim import corpora
 from gensim.models.ldamodel import LdaModel
 import numpy as np
+import spacy
+from sklearn.feature_extraction.text import TfidfVectorizer
+from collections import defaultdict, Counter
 
 nltk.download('stopwords')
+
 # Dictionary mapping RSS elements we're interested in to their actual tags in the RSS.
 RSS_ELEMENTS = {
     'linked_title': 'title',
@@ -610,11 +614,55 @@ def preprocess(text, stop_words):
     return tokens
 
 
+def extract_ngrams(text, n):
+    ngrams = zip(*[text.split()[i:] for i in range(n)])
+    return [' '.join(ngram) for ngram in ngrams]
+
+
+def rake_keywords(text, stopwords):
+    # Define stopwords, punctuations and split by sentence
+    punctuations = '[!\"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~]'
+    sentences = re.split(r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|\?)\s', text)
+
+    # Generate phrases for each sentence
+    phrases = []
+    for sentence in sentences:
+        words = [word.lower() for word in re.split(punctuations, sentence) if word]
+        phrase = []
+        for word in words:
+            if word in stopwords:
+                if phrase:
+                    phrases.append(phrase)
+                    phrase = []
+            else:
+                phrase.append(word)
+        if phrase:
+            phrases.append(phrase)
+
+    # Score words using RAKE methodology
+    word_freq = Counter()
+    word_degree = Counter()
+    for phrase in phrases:
+        unique_words = set(phrase)
+        for word in unique_words:
+            word_freq[word] += 1
+            word_degree[word] += len(phrase)
+
+    scores = {word: word_degree[word] / word_freq[word] for word in word_freq}
+
+    # Extract keywords
+    sorted_keywords = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+
+    return sorted_keywords
+
+
 def analyse_from_file(path: str):
 
     articles = []
     with open(path, 'r') as file:
         articles = json.load(file)
+
+    nlp = spacy.load("en_core_web_sm")
 
     stop_words = set(stopwords.words('english'))
     for article in articles:
@@ -670,6 +718,51 @@ def analyse_from_file(path: str):
         topics = lda_model.print_topics(num_words=5)
         print(f'Lem Topics: {topics}')
         article['lem_lda_topics'] = topics
+
+        bigrams = extract_ngrams(article['full_text'], 2)
+        trigrams = extract_ngrams(article['full_text'], 3)
+        bigram_freq = defaultdict(int)
+        trigram_freq = defaultdict(int)
+        for bigram in bigrams:
+            bigram_freq[bigram] += 1
+
+        for trigram in trigrams:
+            trigram_freq[trigram] += 1
+
+        top_bigrams = sorted(bigram_freq.items(), key=lambda x: x[1], reverse=True)[:5]
+        top_trigrams = sorted(trigram_freq.items(), key=lambda x: x[1], reverse=True)[:5]
+
+        article['raw_bigrams'] = top_bigrams
+        article['raw_trigrams'] = top_trigrams
+
+        print(f'Raw bigrams: {top_bigrams}\nRaw trigrams{top_trigrams}')
+
+        bigrams = extract_ngrams(article['lemmatized_text'], 2)
+        trigrams = extract_ngrams(article['lemmatized_text'], 3)
+        bigram_freq = defaultdict(int)
+        trigram_freq = defaultdict(int)
+        for bigram in bigrams:
+            bigram_freq[bigram] += 1
+
+        for trigram in trigrams:
+            trigram_freq[trigram] += 1
+
+        top_bigrams = sorted(bigram_freq.items(), key=lambda x: x[1], reverse=True)[:5]
+        top_trigrams = sorted(trigram_freq.items(), key=lambda x: x[1], reverse=True)[:5]
+
+        article['lem_bigrams'] = top_bigrams
+        article['lem_trigrams'] = top_trigrams
+
+        print(f'Lem bigrams: {top_bigrams}\nLem trigrams{top_trigrams}')
+
+        raked_keywords = rake_keywords(article['lemmatized_text'], stop_words)
+        article['rake_keywords'] = raked_keywords
+        print(f'Rake keywords: {raked_keywords}')
+
+        doc = nlp(article['full_text'])
+        entities = [(ent.text, ent.label_) for ent in doc.ents]
+        article['entities'] = entities
+        print(f'Entities: {entities}')
 
     # Saving the scraped articles to a JSON file.
     with open('data3.json', 'w') as outfile:
