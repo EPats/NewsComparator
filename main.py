@@ -595,6 +595,9 @@ def get_wordnet_pos(treebank_tag):
 
 
 def lemmatize_text(text, stop_words):
+    text = text.lower()
+    text = re.sub(r'[^\s]*@[^\s]', '', text)
+    text = re.sub(r'[^\w\s]', '', text)
     lemmatizer = WordNetLemmatizer()
     tokenized_sent = sent_tokenize(text)
 
@@ -602,7 +605,7 @@ def lemmatize_text(text, stop_words):
     for sentence in tokenized_sent:
         tokenized_words = word_tokenize(sentence)
         word_pos = nltk.pos_tag(tokenized_words)
-        lemmatized_words = [lemmatizer.lemmatize(word, get_wordnet_pos(pos)) for word, pos in word_pos if word not in stop_words]
+        lemmatized_words = [lemmatizer.lemmatize(word, get_wordnet_pos(pos)) for word, pos in word_pos if word not in stop_words and word not in ["'s", "'re"]]
         lemmatized_sent.append(' '.join(lemmatized_words))
 
     return lemmatized_sent
@@ -615,7 +618,11 @@ def preprocess(text, stop_words):
 
 
 def extract_ngrams(text, n):
-    ngrams = zip(*[text.split()[i:] for i in range(n)])
+    words = word_tokenize(text)
+    words = [word for word in words if re.search(r'\w', word)]
+    # Extracting n-grams from the list of words
+    ngrams = [tuple(words[i:i + n]) for i in range(len(words) - n + 1)]
+
     return [' '.join(ngram) for ngram in ngrams]
 
 
